@@ -1,0 +1,19 @@
+#!/bin/bash
+
+gh api notifications --paginate --jq '.[] | [.subject.url,.subject.type,.url] | @tsv' | while read -r URL TYPE THREAD_URL; do
+    if [[ $TYPE == "Commit" ]]; then
+        continue
+    fi
+    
+    ITEM=$(gh api $URL)
+    NUMBER=$(jq -r .number <<< ${ITEM})
+    TITLE=$(jq -r .title <<< ${ITEM})
+    STATE=$(jq -r .state <<< ${ITEM})
+
+    printf '%-10s %-5s %s\n' $STATE $NUMBER "$TITLE"
+
+    if [[ "$STATE" == "closed" ]]; then
+        echo "Marking closed item #$NUMBER as read: $TITLE $THREAD_URL"
+        gh api -X PATCH $THREAD_URL
+    fi
+done
