@@ -16,13 +16,13 @@ Prerequisites:
 To install this extension:
 
 ```
-gh extension install rnorth/gh-combine-prs
+gh extension install rnorth/gh-tidy-notifications
 ```
 
 or (if using GitHub Enterprise):
 
 ```
-gh extension install github.com/rnorth/gh-combine-prs
+gh extension install github.com/rnorth/gh-tidy-notifications
 ```
 
 ## Usage
