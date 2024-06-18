@@ -10,10 +10,12 @@ gh api notifications --paginate --jq '.[] | [.subject.url,.subject.type,.url] | 
     TITLE=$(jq -r .title <<< ${ITEM})
     STATE=$(jq -r .state <<< ${ITEM})
 
-    printf '%-10s %-5s %s\n' $STATE $NUMBER "$TITLE"
+    if [[ "$STATE" != "null" ]]; then
+        printf '%-10s is %s\n' "$TITLE" $STATE 
 
-    if [[ "$STATE" == "closed" ]]; then
-        echo "Marking closed item #$NUMBER as read: $TITLE $THREAD_URL"
-        gh api -X PATCH $THREAD_URL
+        if [[ "$STATE" == "closed" ]]; then
+            echo "  Marking closed item as read: $THREAD_URL"
+            gh api -X PATCH $THREAD_URL
+        fi
     fi
 done
