@@ -15,7 +15,7 @@ gh api notifications --paginate --jq '.[] | [.subject.url,.subject.type,.url] | 
 
         if [[ "$STATE" == "closed" ]]; then
             echo "  Marking closed item as read: $THREAD_URL"
-            gh api -X PATCH $THREAD_URL
+            gh api -X PATCH --silent $THREAD_URL
         fi
     fi
 done
