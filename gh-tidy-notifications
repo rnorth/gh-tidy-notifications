@@ -1,21 +1,118 @@
 #!/bin/bash
 
-gh api notifications --paginate --jq '.[] | [.subject.url,.subject.type,.url] | @tsv' | while read -r URL TYPE THREAD_URL; do
+# Color definitions
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+GRAY='\033[0;37m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m' # No Color
+
+# Function to get emoji and color for item type
+get_type_style() {
+    case $1 in
+        "PullRequest")
+            echo "🔀 ${CYAN}PR${NC}"
+            ;;
+        "Issue")
+            echo "🐛 ${RED}ISSUE${NC}"
+            ;;
+        "Discussion")
+            echo "💬 ${PURPLE}DISCUSS${NC}"
+            ;;
+        *)
+            echo "📄 ${GRAY}$1${NC}"
+            ;;
+    esac
+}
+
+# Function to get state styling
+get_state_style() {
+    case $1 in
+        "open")
+            echo "${GREEN}●${NC} ${BOLD}OPEN${NC}"
+            ;;
+        "closed")
+            echo "${RED}●${NC} ${DIM}CLOSED${NC}"
+            ;;
+        "merged")
+            echo "${PURPLE}●${NC} ${BOLD}MERGED${NC}"
+            ;;
+        *)
+            echo "${YELLOW}●${NC} $1"
+            ;;
+    esac
+}
+
+# Header
+echo -e "\n${BOLD}${CYAN}🔔 GitHub Notifications Cleanup${NC}"
+echo -e "${GRAY}═══════════════════════════════════════════════════════════════${NC}\n"
+
+# Create temporary files for counters
+TEMP_DIR=$(mktemp -d)
+PROCESSED_FILE="$TEMP_DIR/processed"
+MARKED_READ_FILE="$TEMP_DIR/marked_read"
+echo "0" > "$PROCESSED_FILE"
+echo "0" > "$MARKED_READ_FILE"
+
+# Process notifications
+while read -r URL TYPE THREAD_URL REPO; do
     if [[ $TYPE == "Commit" ]]; then
         continue
     fi
     
-    ITEM=$(gh api $URL)
+    ITEM=$(gh api $URL 2>/dev/null)
+    if [[ $? -ne 0 ]]; then
+        echo -e "  ${DIM}${GRAY}⚠️  Skipping deleted/moved item${NC}"
+        continue
+    fi
+    
     NUMBER=$(jq -r .number <<< ${ITEM})
     TITLE=$(jq -r .title <<< ${ITEM})
     STATE=$(jq -r .state <<< ${ITEM})
 
     if [[ "$STATE" != "null" ]]; then
-        printf '%-10s is %s\n' "$TITLE" $STATE 
+        TYPE_STYLE=$(get_type_style "$TYPE")
+        STATE_STYLE=$(get_state_style "$STATE")
+        
+        # Truncate long titles
+        if [[ ${#TITLE} -gt 60 ]]; then
+            TITLE="${TITLE:0:57}..."
+        fi
+        
+        echo -e "  ${TYPE_STYLE} ${PURPLE}${REPO}${NC} ${WHITE}${TITLE}${NC}"
+        echo -e "    └─ ${STATE_STYLE}"
+        
+        # Increment processed counter
+        PROCESSED=$(cat "$PROCESSED_FILE")
+        echo $((PROCESSED + 1)) > "$PROCESSED_FILE"
 
         if [[ "$STATE" == "closed" ]]; then
-            echo "  Marking closed item as read: $THREAD_URL"
-            gh api -X PATCH $THREAD_URL
+            echo -e "    ${DIM}${YELLOW}📌 Marking as read...${NC}"
+            gh api -X PATCH $THREAD_URL 2>/dev/null
+            
+            # Increment marked read counter
+            MARKED_READ=$(cat "$MARKED_READ_FILE")
+            echo $((MARKED_READ + 1)) > "$MARKED_READ_FILE"
         fi
+        
+        echo ""
     fi
-done
+done < <(gh api notifications --paginate --jq '.[] | [.subject.url,.subject.type,.url,.repository.full_name] | @tsv')
+
+# Read final counters
+PROCESSED=$(cat "$PROCESSED_FILE")
+MARKED_READ=$(cat "$MARKED_READ_FILE")
+
+# Clean up temp files
+rm -rf "$TEMP_DIR"
+
+# Footer summary
+echo -e "${GRAY}═══════════════════════════════════════════════════════════════${NC}"
+echo -e "${BOLD}${GREEN}✅ Summary:${NC} Processed ${BOLD}$PROCESSED${NC} items, marked ${BOLD}$MARKED_READ${NC} as read"
+echo -e "${DIM}${GRAY}🕒 $(date)${NC}\n"
