@@ -94,7 +94,7 @@ while read -r URL TYPE THREAD_URL REPO; do
 
         if [[ "$STATE" == "closed" ]]; then
             echo -e "    ${DIM}${YELLOW}📌 Marking as read...${NC}"
-            gh api -X PATCH $THREAD_URL 2>/dev/null
+            gh api -X PATCH --silent $THREAD_URL 2>/dev/null
             
             # Increment marked read counter
             MARKED_READ=$(cat "$MARKED_READ_FILE")
